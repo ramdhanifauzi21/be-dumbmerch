@@ -4,11 +4,9 @@ WORKDIR /app
 COPY . .
 RUN go mod download
 RUN go build -o main .
-
-# Staging
+# Run
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/main .
-COPY --from=builder /app/.env .
 EXPOSE 5000
 CMD ["./main"]
