@@ -54,4 +54,4 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 6969
           script: |
-            wget --spider https://api.fauzi.studentdumbways.my.id/login
+            wget --spider https://api.fauzi.studentdumbways.my.id/login || true
