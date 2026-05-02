@@ -1,0 +1,57 @@
+name: CI/CD Production BE
+on:
+  push:
+    branches:
+      - production
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Create .env file
+        run: |
+          echo "REACT_APP_BASEURL=${{ secrets.REACT_APP_BASEURL_production }}" > .env
+      - name: SonarQube scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=be-dumbmerch-production
+      - name: Login to Docker Registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:production .
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:production
+          format: table
+          exit-code: 0
+      - name: Push image to registry
+        run: |
+          docker push ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:production
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 6969
+          script: |
+            cd /home/finaltask-fauzi/be-production
+            docker compose pull
+            docker compose up -d --force-recreate
+      - name: Test app with wget spider
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 6969
+          script: |
+            wget --spider https://api.fauzi.studentdumbways.my.id/login
