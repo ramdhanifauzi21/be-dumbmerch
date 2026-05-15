@@ -1,6 +1,6 @@
 services:
   backend:
-    image: registry.fauzi.studentdumbways.my.id/be-dumbmerch:staging
+    build: .
     container_name: be-staging
     restart: always
     ports:
