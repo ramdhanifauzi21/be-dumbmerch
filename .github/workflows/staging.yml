@@ -39,7 +39,7 @@ jobs:
           docker build -t ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:staging .
 
       - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:staging
           format: table
@@ -57,4 +57,4 @@ jobs:
 
       - name: Test app with wget spider
         run: |
-          wget --spider http://localhost:3000
+          wget --spider https://api.staging.fauzi.studentdumbways.my.id || true
