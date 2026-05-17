@@ -3,24 +3,12 @@ on:
   push:
     branches:
       - staging
-
 jobs:
-  deploy:
+  sonarqube:
     runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Create .env file
-        run: |
-          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > .env
-          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
-          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
-          echo "PORT=5000" >> .env
-
       - name: SonarQube scan
         uses: sonarsource/sonarqube-scan-action@master
         env:
@@ -30,31 +18,51 @@ jobs:
           args: >
             -Dsonar.projectKey=be-dumbmerch-staging
 
+  build:
+    runs-on: self-hosted
+    needs: sonarqube
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Create .env file
+        run: |
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > .env
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+          echo "PORT=5000" >> .env
       - name: Login to Docker Registry
         run: |
           echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
-
       - name: Build Docker image
         run: |
           docker build -t ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:staging .
-
       - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:staging
           format: table
           exit-code: 0
-
       - name: Push image to registry
         run: |
           docker push ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:staging
 
+  deploy:
+    runs-on: self-hosted
+    needs: build
+    steps:
       - name: Deploy
         run: |
-          cd /home/finaltask-fauzi/be-staging
+          cd /home/fauzi/be-staging
           docker compose pull
           docker compose up -d --force-recreate
 
+  test:
+    runs-on: self-hosted
+    needs: deploy
+    steps:
       - name: Test app with wget spider
         run: |
           wget --spider https://api.staging.fauzi.studentdumbways.my.id || true
