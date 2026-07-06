@@ -71,7 +71,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 6969
           script: |
-            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
             cd /home/${{ secrets.APPS_USER }}/be-staging
             docker compose pull
             docker compose up -d --force-recreate
