@@ -1,9 +1,0 @@
-services:
-  backend:
-    build: .
-    container_name: be-production
-    restart: always
-    ports:
-      - "5001:5000"
-    env_file:
-      - .env

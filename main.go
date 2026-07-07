@@ -18,7 +18,7 @@ func main() {
 	// env
 	errEnv := godotenv.Load()
     if errEnv != nil {
-		panic("Failed to load env file")
+		fmt.Println("Info: .env file not found, using OS/Docker's variables.")
     }
 	
 	// initial DB
