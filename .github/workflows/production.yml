@@ -7,6 +7,9 @@ on:
     paths-ignore:
       - "k8s/**"
 
+permissions:
+  contents: write
+
 jobs:
   sonarqube:
     runs-on: self-hosted
@@ -64,6 +67,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: production
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update image tag in deployment manifest
         run: |
