@@ -1,19 +1,24 @@
 name: CI/CD Production BE
+
 on:
   push:
     branches:
       - production
+    paths-ignore:
+      - "k8s/**"
+
 jobs:
   sonarqube:
     runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: SonarQube scan
         uses: sonarsource/sonarqube-scan-action@master
         env:
-          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
         with:
           args: >
             -Dsonar.projectKey=be-dumbmerch-production
@@ -21,48 +26,53 @@ jobs:
   build:
     runs-on: self-hosted
     needs: sonarqube
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Create .env file
-        run: |
-          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > .env
-          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
-          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
-          echo "PORT=5000" >> .env
+
+      - name: Set image tag
+        id: vars
+        run: echo "image_tag=production-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Login to Docker Registry
         run: |
           echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:production .
+          docker build -t ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:${{ steps.vars.outputs.image_tag }} .
+
       - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:production
+          image-ref: ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:${{ steps.vars.outputs.image_tag }}
           format: table
+          severity: CRITICAL,HIGH
           exit-code: 0
+
       - name: Push image to registry
         run: |
-          docker push ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:production
+          docker push ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:${{ steps.vars.outputs.image_tag }}
 
-  deploy:
+  update-manifest:
     runs-on: self-hosted
     needs: build
     steps:
-      - name: Deploy
-        run: |
-          cd /home/fauzi/be-production
-          docker compose pull
-          docker compose up -d --force-recreate
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: production
 
-  test:
-    runs-on: self-hosted
-    needs: deploy
-    steps:
-      - name: Test app with wget spider
+      - name: Update image tag in deployment manifest
         run: |
-          wget --spider https://api.production.fauzi.studentdumbways.my.id || true
+          sed -i "s|image: .*/be-dumbmerch:.*|image: ${{ secrets.DOCKER_REGISTRY }}/be-dumbmerch:${{ needs.build.outputs.image_tag }}|g" k8s/be-deployment.yaml
+
+      - name: Commit and push manifest update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/be-deployment.yaml
+          git commit -m "chore: update be-dumbmerch image to ${{ needs.build.outputs.image_tag }}" || echo "No changes to commit"
+          git push origin production
