@@ -17,7 +17,7 @@ spec:
         - name: registry-secret
       containers:
         - name: be-dumbmerch
-          image: registry.fauzi.studentdumbways.my.id/be-dumbmerch:production
+          image: registry.fauzi.studentdumbways.my.id/be-dumbmerch:production-6b87392
           ports:
             - containerPort: 5000
           envFrom:
